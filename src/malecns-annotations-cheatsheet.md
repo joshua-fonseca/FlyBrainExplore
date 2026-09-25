@@ -51,6 +51,38 @@ identifiers, cross references to other datasets, spatial coordinates, and specia
 | `trumanHl` | hemilineage label under an alternate (truman lab) naming scheme for the same underlying developmental lineages. | varies | inferred |
 | `assignedOlHex1` / `assignedOlHex2` | coordinates on the optic lobe's hexagonal grid, the fly visual system is organized into repeating columns arranged in a hex pattern, and these two values likely give a column's grid address. only populated for optic lobe neurons (note the high `NaN` count). | varies | inferred |
 
+## superclass values
+
+the `superclass` column has 27 possible values (26 named plus `nan` for unclassified rows). prefix tells you the region, suffix tells you the role. `_tbc` suffix appears to mean "to be confirmed", a provisional label, not officially documented so treat as unclear.
+
+region prefixes: `ol` = optic lobe (vision), `cb` = central brain, `vnc` = ventral nerve cord (the fly's spinal cord equivalent), `sensory`/`visual`/`efferent`/`ascending`/`descending` with no region prefix = the role itself is the main distinguishing feature, cutting across regions. `ENS` = enteric nervous system (gut).
+
+| value | what it means | human analogy | confidence |
+|---|---|---|---|
+| `ol_sensory` | primary visual input, the photoreceptors themselves. | the retina, the very first cells that catch light. | inferred |
+| `ol_intrinsic` | neurons that live and process entirely within the optic lobe, don't leave it. | local circuitry in the retina/early visual cortex doing edge/motion detection before signal goes anywhere else. | confirmed |
+| `visual_projection` | neurons that carry processed visual signal out of the optic lobe into the central brain. | the optic nerve, the cable carrying "already partly processed" visual info from eye to brain. | confirmed |
+| `visual_centrifugal` | neurons that send signal backward, from central brain back into the optic lobe. | feedback wiring, the brain "tuning" what the eye pays attention to, like top down attention. | confirmed |
+| `cb_sensory` | sensory input arriving directly into the central brain, not through the optic lobe or vnc (e.g. antennae, mouthparts). | smell/taste/touch signals reaching the brain directly, not via the spinal cord. | confirmed |
+| `cb_intrinsic` | neurons that live and process entirely within the central brain. | the "thinking" part of the brain, local associative circuitry, decision making. | confirmed |
+| `cb_motor` | motor neurons that originate in the central brain (not vnc), likely controlling head/mouthpart movement. | cranial nerves controlling your face/jaw, as opposed to spinal nerves controlling limbs. | inferred |
+| `cb_efferent` | central brain neurons sending output directly to the periphery, bypassing the vnc. | a brain signal that skips the spinal cord entirely and goes straight to a gland or muscle near the head. | inferred |
+| `cb_endocrine` | central brain neurons that release hormones rather than firing chemical/electrical synapses. | the hypothalamus, the brain region that controls hormone release. | confirmed |
+| `descending_neuron` | carries a signal from the central brain down into the vnc, a command. | upper motor neurons in your spinal cord, brain telling the body what to do. | confirmed |
+| `ascending_neuron` | carries a signal from the vnc up into the central brain, a status report. | sensory tracts running up your spinal cord telling the brain what the body is feeling. | confirmed |
+| `vnc_sensory` | sensory input arriving directly into the vnc (legs, wings, body surface). | touch/proprioception sensors in your limbs feeding straight into the spinal cord. | confirmed |
+| `vnc_intrinsic` | neurons that live and process entirely within the vnc. | local spinal cord circuits, like the reflex arc that pulls your hand off a hot stove without waiting for the brain. | confirmed |
+| `vnc_motor` | motor neurons originating in the vnc, drive the legs/wings/flight muscles directly. | lower motor neurons in your spinal cord, the final link to your leg muscles. | confirmed |
+| `vnc_efferent` | vnc neurons sending output to the periphery, similar role to vnc_motor but a distinct annotation bucket. | output nerves leaving the spinal cord toward the body, not necessarily to a skeletal muscle. | unclear |
+| `vnc_endocrine` | vnc neurons that release hormones. | hormone-releasing cells located along the spinal cord rather than the brain. | inferred |
+| `sensory_ascending` | sensory neurons whose signal is heading upward toward the brain, may overlap conceptually with vnc_sensory/ascending_neuron. | same idea as ascending_neuron, exact distinction between this and vnc_sensory not confirmed from public docs. | unclear |
+| `sensory_descending` | sensory neurons whose signal or fiber projects downward, rare category. | not confidently mapped to a clean human analogy, exact distinction unclear. | unclear |
+| `efferent_ascending` | very rare category (single digit count), output type neuron traveling upward, exact meaning not confirmed. | no confident analogy, flagged for verifying directly in data if it matters to your project. | unclear |
+| `efferent_descending` | output type neuron traveling downward, distinct from descending_neuron in the annotation scheme, exact distinction unclear. | possibly a finer subtype of the descending command pathway. | unclear |
+| `ENS` | enteric nervous system, neurons controlling the gut, largely independent of the main brain/vnc circuits. | your own enteric nervous system, sometimes called the "second brain", the gut's semi-autonomous nerve network. same term used in human biology. | confirmed |
+| `cb_sensory_tbc` / `visual_projection_tbc` / `sensory_ascending_tbc` / `vnc_sensory_tbc` / `vnc_tbc` | provisional versions of the categories above, annotation not fully finalized yet. | a draft label, "probably this bucket, not double checked yet." | unclear |
+| `nan` | no superclass assigned, likely correlates with non-traced/non-neuronal rows (orphan, glia, unimportant, etc, see `status` above). | an unlabeled record. | inferred |
+
 ## things worth verifying yourself as you go
 
 the unclear rows are the ones where a solid public definition wasn't findable, that's a good "next question" list:
