@@ -90,6 +90,9 @@ def exploring_connections():
 
     lookup = traced[['bodyId', 'superclass']]
 
+    # DuckDB does the join/aggregation in compiled C++ under the hood
+    # it never materializes 151M rows into Python objects at all
+    # it doesn't have to copy the data, so it seems it like works directly on the file
     con = duckdb.connect()
 
     # settings: caps how much memory DuckDB is allowed to use
