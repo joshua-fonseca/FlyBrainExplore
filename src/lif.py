@@ -145,4 +145,21 @@ for t in range(time_steps):
 # they dont have any edges connecting to anyone else so they fire and go to rest,
 # while the others slowly go to rest
 
+# as a result of this experiment what was learned: 
+# ol -> vnc means the charge has to travel quite far
+# so for that to happen, weights need to change so that the right paths get reinforced
+# - down the line, some rule* that adjusts weights based on simulation runs
+# bottom line: the fly is dead. so this file can be treated as a starting point to train the fly
+
+# from here the decision can be made to expand what is currently built;
+# to get a charge from ol_sensory to vnc_motor
+# or circle back to that "some rule"
+
+# to expand what is currently built, collect neighbours of 26947, 29782
+# and add them to neuron_ids and edge structures. then repeat until reaching vnc_motor
+# nothing about simulation logic changes, maybe the parameters, but only neuron_ids and edges itself grows
+# note: graph traversal like dfs or bfs exist for this problem...
+# - trying to find a vnc_motor neuron as the solution, while finding the path that lets charges travel there
+
+
 
