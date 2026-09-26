@@ -161,5 +161,65 @@ for t in range(time_steps):
 # note: graph traversal like dfs or bfs exist for this problem...
 # - trying to find a vnc_motor neuron as the solution, while finding the path that lets charges travel there
 
+filtered_path = root / 'data' / 'pipeline_edges_filtered.feather'
+if filtered_path.exists():
+    strong_only = pd.read_feather(filtered_path)
+else:
+    # code from the exploration
+    import pyarrow.feather as feather
+    import duckdb
+
+    meta = feather.read_table(connections_file, memory_map=True)
+
+    traced = df[df['status'] == 'Traced']
+    lookup = traced[['bodyId', 'superclass']]
+
+    target_superclasses = [
+        'ol_sensory', 'ol_intrinsic', 'visual_projection',
+        'cb_intrinsic', 'descending_neuron',
+        'vnc_intrinsic', 'vnc_motor'
+    ]
+
+    # again let duckdb do the heavy lifting
+    con = duckdb.connect()
+    con.execute("PRAGMA memory_limit='6GB'")
+    con.execute("PRAGMA threads=2")
+
+    con.register('lookup', lookup)
+    con.register('connections', meta)
+
+    placeholders = ",".join(["?"] * len(target_superclasses))
+
+    pipeline_edges = con.execute(f"""
+        SELECT c.body_pre, c.body_post, c.weight,
+            pre.superclass AS pre_sc, post.superclass AS post_sc
+        FROM connections AS c
+        JOIN lookup AS pre ON c.body_pre = pre.bodyId
+        JOIN lookup AS post ON c.body_post = post.bodyId
+        WHERE pre.superclass IN ({placeholders})
+        AND post.superclass IN ({placeholders})
+    """, target_superclasses + target_superclasses).df()
+    
+    print(pipeline_edges.shape) # (22237488, 5) -> very large
+    print(pipeline_edges.head())
+
+    # try trimming the data, remember the '1' weights were trimmed
+    # although because they were NaN ids, a weight of 1 is insignificant for the toy test
+
+    # same-superclass edges are local self-talk, not pipeline progress
+    cross_region = pipeline_edges[pipeline_edges['pre_sc'] != pipeline_edges['post_sc']]
+
+    # weight=1 correlated with unreliable/fragment-adjacent connections earlier
+    strong_only = cross_region[cross_region['weight'] >= 3]
+
+    print(strong_only.shape)
+
+    strong_only.to_feather(root / 'data' / 'pipeline_edges_filtered.feather')
+
+strong_only_sorted = strong_only.sort_values('weight', ascending=False)
+print(strong_only_sorted.head(20))
+
+
+
 
 
