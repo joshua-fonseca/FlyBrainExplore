@@ -61,7 +61,7 @@ filter_expr = (pc.field("body_pre") == neuron_id) | (pc.field("body_post") == ne
 # only then after we have a small subset can we go back to pandas
 neighbours = dataset.to_table(filter=filter_expr).to_pandas()
 print(neighbours.shape)
-print(neighbours)
+# print(neighbours)
 # 27 of 32 rows have 11139 as body_pre, which makes sense -> eyes see then must send that info out
 # some id's look off, they look to be in the millions
 
@@ -81,11 +81,68 @@ id_to_status = df.set_index('bodyId')['status'].to_dict()
 
 neighbours['pre_status'] = neighbours['body_pre'].map(id_to_status)
 neighbours['post_status'] = neighbours['body_post'].map(id_to_status)
-print(neighbours)
+# print(neighbours)
 # this further confirms the suspicion that the big ID's are not annotated at all
 
 # filter out these NaN neighbours since the cluster needed requires neurons
 # that can be labelled and reasoned about
 
-real_neighbors = neighbours.dropna(subset=['pre_type', 'post_type'])
-print(real_neighbors)
+real_neighbours = neighbours.dropna(subset=['pre_type', 'post_type']) # drop if subset cols has missing values
+print(real_neighbours)
+
+neuron_ids = real_neighbours[['body_pre', 'body_post']].stack().unique().tolist() # flatten, remove dupes, then list
+
+# set up the neurons and connections as plain Python structures
+charge = {nid: 0 for nid in neuron_ids} # dict comprehension -> everyone starts at 0 charge
+
+# convert df rows into tuples -> (pre, post, weight)
+# - iterate over specific columns so must filter them
+# - index=False excludes index from the tuple, and name=None prevents a named tuple.. whatever that means
+edges = list(real_neighbours[['body_pre', 'body_post', 'weight']].itertuples(index=False, name=None))
+print(edges)
+
+# constants
+# decay: each tick, whatever charge is sitting in a bucket loses 20% of itself. fast, but shows change
+# threshold: want at least one neuron to actually fire in this toy run
+# time_steps: let's see what happens
+decay_factor = 0.8
+threshold = 5
+time_steps = 6
+
+# external input mentioned
+# - at tick 0, the photoreceptor gets a huge unit of charge simulating light hitting the eye
+external_input = {11139: 10}
+
+for t in range(time_steps):
+    print(f"--- time step {t} ---")
+
+    # apply external input only at the very first tick
+    if t == 0:
+        for nid, amount in external_input.items():
+            print("external applied to", nid)
+            charge[nid] += amount
+
+    # figure out who fires this tick, based on charge BEFORE any resets happen
+    fired = [nid for nid in neuron_ids if charge[nid] >= threshold]
+
+    # apply the leak to everyone
+    for nid in neuron_ids:
+        charge[nid] *= decay_factor
+
+    # firing neurons dump their charge to neighbors, then reset to 0
+    for pre, post, weight in edges:
+        if pre in fired:
+            print(f"{pre} fires away to {post}")
+            charge[post] += weight
+
+    for nid in fired:
+        charge[nid] = 0
+
+    print({nid: round(c, 2) for nid, c in charge.items()})
+
+# analysis:
+# while yes the other ones pass the threshold, particularly 26947 and 29782,
+# they dont have any edges connecting to anyone else so they fire and go to rest,
+# while the others slowly go to rest
+
+
