@@ -1,0 +1,10 @@
+import pandas as pd
+from pathlib import Path
+
+root = Path(__file__).resolve().parent.parent
+neurons_file = root / 'data' / 'body-annotations-male-cns-v1.0-minconf-0.5.feather'
+df = pd.read_feather(neurons_file)
+
+traced = df[df['status'] == 'Traced']
+
+# does audio input exists at all in this data
