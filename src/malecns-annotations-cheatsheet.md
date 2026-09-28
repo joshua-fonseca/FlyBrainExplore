@@ -32,9 +32,9 @@ identifiers, cross references to other datasets, spatial coordinates, and specia
 | `rootSide` | side of the segmentation "root" point (a technical anchor point in the 3d reconstruction), may or may not match `somaSide`. worth comparing the two columns directly to see if/when they differ. | `L`/`R`/`M` | unclear |
 | `somaLocation` | 3d spatial coordinates of the cell body (x, y, z). stored as an array, which is why `.nunique()` crashed on it earlier. | `[x, y, z]` | confirmed |
 | `tosomaLocation` | a reference point/vector related to soma position, likely used for orienting the skeleton toward the soma. exact technical definition unclear from public docs. | array, like somaLocation | unclear |
-| `entryNerve` | for sensory/afferent neurons, which peripheral nerve this neuron enters the cns through. | `adult metathoracic leg nerve` | confirmed |
+| `entryNerve` | for sensory/afferent neurons, the peripheral nerve this sensory neuron uses to enter the central nervous system (CNS, which is the brain and spinal cord). | `adult metathoracic leg nerve` | confirmed |
 | `exitNerve` | for motor/efferent neurons, which peripheral nerve this neuron exits the cns through. | `adult first abdominal nerve` | confirmed |
-| `receptorType` | sensory modality this neuron is associated with (e.g. mechanosensory, chemosensory), for sensory neurons only. | varies | inferred |
+| `receptorType` | the type of sense this neuron detects (e.g. mechanosensory, chemosensory), for sensory neurons only. | varies | inferred |
 | `serialMotif` | identifies which serially repeating set of homologous neurons this one belongs to (many neuron types repeat once per body segment). | varies | inferred |
 | `mancSerial` / `mcnsSerial` | position number within a serial motif set, in the manc dataset vs this malecns dataset respectively. | integer | inferred |
 | `group` | a grouping id, likely clusters neurons considered functionally/connectionally similar during annotation. exact criteria not confirmed. | varies | unclear |
