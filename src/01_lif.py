@@ -15,7 +15,7 @@
 
 # Fire:
 # - once the water crosses a THRESHOLD, the neuron fires
-# - all of it's water is dumped to every neuron it's connected to
+# - each spike delivers weight units to every target
 # - amount of water depends on the weight of the connection
 # - the bucket is back to being empty, or near empty
 
