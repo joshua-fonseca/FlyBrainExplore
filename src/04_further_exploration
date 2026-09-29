@@ -7,4 +7,129 @@ df = pd.read_feather(neurons_file)
 
 traced = df[df['status'] == 'Traced']
 
-# does audio input exists at all in this data
+# more for building
+id_to_superclass = traced.set_index('bodyId')['superclass'].to_dict()
+
+connections_file = root / 'data' / 'connectome-weights-male-cns-v1.0-minconf-0.5.feather'
+
+import pyarrow.dataset as ds
+import pyarrow.compute as pc
+
+dataset = ds.dataset(connections_file, format="feather")
+
+# question: does audio input exists at all in this data?
+
+# in the annotations cheatsheet, this superclass relates to sensory input not through vnc (possibly hearing)
+cb_sensory = traced[traced['superclass'] == 'cb_sensory']
+
+# receptorType: what sensory neurons
+# entryNerve: which nerve carries the neuron
+print(cb_sensory['receptorType'].value_counts()) 
+print(cb_sensory['entryNerve'].value_counts())
+# result:
+# receptorType came back empty, entryNerve did come back
+
+print('debug')
+print(traced[['superclass', 'receptorType']].value_counts())
+# result:
+# receptorType isn't broken, it's just populated for vnc_sensory, not cb_sensory
+
+# receptorTypes are ppk23 ppk25 IR52b, part of vnc_sensory
+# but apparently ppk23, ppk25, and IR52b are genes that play roles in
+# pheromone detection, species recognition, and the regulation of courtship behaviors
+# conclusion: receptor types may not be useful to look at
+
+# however, for the entryNerve, AN has a large neuron count (AN is assumed to be the antenna of the fly)
+# AN neurons are hearing, smell, or a mix of both, since the antenna carries both
+
+# Check if type or class gives a modality clue for the AN group, since receptorType won't
+an_neurons = traced[traced['entryNerve'] == 'AN']
+print(an_neurons['class'].value_counts())
+# class confirmed mechanosensory neurons exist
+# # 744 in class mechanosensory -> systems that can respond to sound, touch, motion, etc
+
+print(an_neurons['type'].value_counts().head(20))
+# finer-grained follow-up
+# a few JO-xxxxx types -> johnston's organ on antenna (responsible for Hearing and Sound Detection)
+
+# drill down on the JO types
+jo_neurons = traced[traced['type'].str.contains('JO', na=False)]
+print(jo_neurons['type'].value_counts())
+print(jo_neurons.shape)
+
+# it looks like there is a lot of JO families maybe for a different purpose -> research
+
+# JO is split into 5 subgroups by projection pattern in the brain: JO-A through JO-E
+# only JO-A and JO-B are actually sound/vibration sensors
+# - JO-A: high frequency tuned, connects strongly to the escape pathway
+# - JO-B: low frequency tuned, connects to both escape AND the song-relay pathway
+#   (song-relay is fly courtship song processing, closest match to "rhythm")
+# JO-C, JO-D, JO-E are NOT sound, they sense wind/gravity instead
+
+# source: Ishikawa et al. 2020 (frontiersin.org/articles/10.3389/fphys.2019.01552)
+#         Mamiya lab et al., wiring patterns paper (pmc.ncbi.nlm.nih.gov/articles/PMC7676477)
+
+jo_auditory = jo_neurons[jo_neurons['type'].str.contains('JO-A|JO-B', na=False, regex=True)]
+print(jo_auditory['type'].value_counts())
+print(jo_auditory.shape)
+
+# JO-B outnumbers JO-A, 82 versus 50, once you sum each family's subtypes.
+# Combined with the finding that JO-B is the one wired toward song-relay, and more neurons,
+# JO-B is a strong candidate for a rhythm-based input stage
+
+# side track:
+# remember in the initial exploration, it was concluded an image had to go from ol_sensory -> vnc_motor
+# there was a gap in that which was was revealed in this exercise: the subgroups of ol_sensory and vnc_motor
+# were not checked. it is not known if the correct responsible neurons were used, so that will be checked.
+
+ol_sensory_neurons = traced[traced['superclass'] == 'ol_sensory']
+print(ol_sensory_neurons['type'].value_counts())
+print(ol_sensory_neurons.shape)
+# by sheer luck, the random neuron chosen for the ol_sensory was of type R1-R6, which is responsible for
+# motion and brightness detection which is more appropriate to reacting to a moving visual pattern
+
+# now to check the other end, vnc_motor
+vnc_motor_neurons = traced[traced['superclass'] == 'vnc_motor']
+print(vnc_motor_neurons['type'].value_counts())
+print(vnc_motor_neurons.shape)
+
+print(vnc_motor_neurons['exitNerve'].value_counts())
+
+print(vnc_motor_neurons['somaNeuromere'].value_counts())
+
+# check the end node of the path traced in 03_scaled_lif.py
+print(vnc_motor_neurons[vnc_motor_neurons['bodyId'] == 164190][['type', 'exitNerve', 'somaNeuromere']])
+# result: it is cooked
+#           type exitNerve somaNeuromere
+# 116318  MNad21      AbN2            A1
+
+# Ab almost certainly stands for abdominal, in A1, the first abdominal segment
+# So next time, check both start and end points for where they actually are
+# This would help find a leg motor:
+
+# leg_motor_ids = vnc_motor_neurons[vnc_motor_neurons['somaNeuromere'].isin(['T1', 'T2', 'T3'])]['bodyId']
+# valid_targets = [nid for nid in leg_motor_ids if nid in G.nodes]
+# print(len(valid_targets))
+
+# reachable = nx.descendants(G, source_id)
+# reachable_motor = [nid for nid in valid_targets if nid in reachable]
+# print(len(reachable_motor))
+
+# returning back to the JO neurons,
+# the next step would be to try and make a path just like ol_sensory -> vnc_motor
+# except check the start and endpoints: looking for (JO-B* -> T1, T2, T3)
+
+# prints all columns
+# with pd.option_context('display.max_columns', None):
+#     print(jo_auditory.head())
+
+jo_id = jo_auditory['bodyId'].iloc[3]
+print('bodyId we are interested in:', jo_id)
+
+# building starts
+
+# same neighbour-finding move that was now done twice
+filter_expr = (pc.field("body_pre") == jo_id) | (pc.field("body_post") == jo_id)
+jo_neighbours = dataset.to_table(filter=filter_expr).to_pandas()
+print(jo_neighbours.shape)
+print(jo_neighbours)
