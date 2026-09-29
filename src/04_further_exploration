@@ -301,4 +301,68 @@ print(traced[traced['bodyId'].isin(motor_targets['body_post'])][['bodyId', 'type
 # which controls the middle pair of legs, the fly's primary walking/jumping legs.
 
 # side track: look at vnc_intrinsic, the largest weights that the descending neuron connects to
+vnc_intrinsic_targets = outgoing[outgoing['post_type'] == 'vnc_intrinsic'].sort_values('weight', ascending=False)
+print(vnc_intrinsic_targets.shape)
+print(vnc_intrinsic_targets.head(10))
 
+# don't stop at the superclass label, look at the actual named identities of the strongest few
+top_vnc_ids = vnc_intrinsic_targets.head(10)['body_post']
+print(traced[traced['bodyId'].isin(top_vnc_ids)][['bodyId', 'type', 'instance', 'somaNeuromere', 'subclass']])
+# in here, Every single one of these is named IN___
+# this is where the real processing muscle is, not the small direct shortcut
+# 7 of these 10 land in T1, only 3 in T2
+# this strongest vnc_intrinsic bucket looks like it's mostly driving a different pair of legs
+
+# IN00A010 shows up twice, once in T1 (801689) and once in T2 (919595)
+print(traced[traced['bodyId'].isin([801689, 919595])][['bodyId', 'type', 'serialMotif', 'mancSerial']])
+
+in23b001_id = 800373  # strongest single connection, weight 120, T1
+filter_expr = (pc.field("body_pre") == in23b001_id) | (pc.field("body_post") == in23b001_id)
+in_neighbours = dataset.to_table(filter=filter_expr).to_pandas()
+in_neighbours['post_type'] = in_neighbours['body_post'].map(id_to_superclass)
+
+out_in = in_neighbours[in_neighbours['body_pre'] == in23b001_id]
+print(out_in.groupby('post_type', dropna=False)['weight'].sum().sort_values(ascending=False))
+# IN23B001 (the T1 branch just checked) drives vnc_motor directly, weight 225
+# That's over 4x stronger than the 50-weight direct motor link found from DNp02
+# DNp02 mostly drives interneurons, and those interneurons are where the strong,
+# reliable motor drive actually comes from, the direct DNp02 to motor link was the minor shortcut,
+# and this interneuron layer is the main event.
+
+# two full, verified, named pathways, both starting from the same auditory input:
+# T2 (middle leg): JO-B1_a -> 15233 -> DNp02 -> TTMn/extensor/flexor motor neurons (weak direct link, weight 50)
+# T1 (front leg): JO-B1_a -> 15233 -> DNp02 -> IN23B001 (interneuron, vnc convergent motif) -> motor neurons (strong link, weight 225)
+
+# second path is the stronger, more biologically convincing one,
+# sound drives an interneuron layer, which drives motor output,
+# the actual expected shape of a reflex circuit, not just a lucky direct wire
+
+# which specific motor neurons IN23B001 lands on, same move as before
+motor_from_in = out_in[out_in['post_type'] == 'vnc_motor']
+print(traced[traced['bodyId'].isin(motor_from_in['body_post'])][['bodyId', 'type', 'instance', 'somaNeuromere']])
+# gem alert
+# No T1 targets at all, despite IN23B001 itself sitting in T1
+# Instead it's split between T2 (13) and T3 (19), the middle and hind legs
+# This lines up with the serialMotif label from before, vnc convergent,
+# convergent is the right word for a hub that gathers/distributes across segments rather than staying local
+
+# now have a complete, hand-verified, six-hop pathway with a real biological shape
+
+import networkx as nx
+
+G = nx.DiGraph()
+
+confirmed_path_edges = [
+    (jo_id, 15233, 46),
+    (15233, 10197, 12),        # DNp02
+    (10197, 800373, 120),      # IN23B001
+]
+
+for pre, post, w in confirmed_path_edges:
+    G.add_edge(pre, post, weight=w)
+
+for _, row in motor_from_in.iterrows():
+    G.add_edge(in23b001_id, row['body_post'], weight=row['weight'])
+
+print(G.number_of_nodes(), 'nodes,', G.number_of_edges(), 'edges')
+print(list(nx.all_simple_paths(G, source=jo_id, target=800589)))  # one example flexor MN
