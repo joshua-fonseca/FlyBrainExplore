@@ -117,19 +117,188 @@ print(vnc_motor_neurons[vnc_motor_neurons['bodyId'] == 164190][['type', 'exitNer
 
 # returning back to the JO neurons,
 # the next step would be to try and make a path just like ol_sensory -> vnc_motor
-# except check the start and endpoints: looking for (JO-B* -> T1, T2, T3)
 
-# prints all columns
+# -------------------------------
+
+# except this time, do it by hand.
+# networkx can absolutely find a shortest path between two IDs in one line
+# but it's not known which two IDs matter, there is no confirmed "sound goes in here" neuron
+# and a confirmed "movement comes out here" neuron to connect. thus hopping manually is done.
+
+# prints all columns - to look for any JO-B* neurons
 # with pd.option_context('display.max_columns', None):
 #     print(jo_auditory.head())
 
-jo_id = jo_auditory['bodyId'].iloc[3]
+jo_id = jo_auditory['bodyId'].iloc[3] # with the above, it was found to be here
 print('bodyId we are interested in:', jo_id)
 
-# building starts
+# building starts -> what neurons are outbound from the chosen JO-B* one
 
 # same neighbour-finding move that was now done twice
 filter_expr = (pc.field("body_pre") == jo_id) | (pc.field("body_post") == jo_id)
 jo_neighbours = dataset.to_table(filter=filter_expr).to_pandas()
 print(jo_neighbours.shape)
 print(jo_neighbours)
+
+#       body_pre  body_post  weight
+# 0        42619      15233      46
+# 1        42619     525475      45
+# 2        42619      13014      42
+# 3        42619      11378      42
+# 4        42619      12066      39
+# ..         ...        ...     ...
+# 280  915820880      42619       1
+# 281      10074      42619       1
+# 282  923995712      42619       1
+# 283  941637235      42619       1
+# 284  968187269      42619       1
+
+# Note: Some body_pre/body_post values are enormous
+
+# Same move as with 11139 and ol_sensory,
+# translate through id_to_superclass before trusting any of these IDs as meaningful:
+jo_neighbours['pre_type'] = jo_neighbours['body_pre'].map(id_to_superclass)
+jo_neighbours['post_type'] = jo_neighbours['body_post'].map(id_to_superclass)
+
+print(jo_neighbours['pre_type'].value_counts(dropna=False))
+print(jo_neighbours['post_type'].value_counts(dropna=False))
+# dropna=False matters here specifically, want to actually see how many of those 285 rows map to NaN
+# mainly want to see if NaN contributes a lot or not
+
+# since the strongest connections are the ones most likely to matter for a "does this respond to rhythmic input" story,
+# sort and look at the top few by weight directly:
+top_outgoing = jo_neighbours[jo_neighbours['body_pre'] == jo_id].sort_values('weight', ascending=False)
+print(top_outgoing.head(10))
+# results:
+# - JO-B1_a itself classifies as cb_sensory -> they're already central-brain sensory (AN carries straight to brain)
+# - strongest connections are ALL from the sensory neuron to CB processing neurons, and it's all quite consistent
+# unlike in the ol_sensory, it went to different superclasses of neurons within it's top 10 weights
+
+# in post_type, there are 177 NaN rows. alot! so see if those rows contribute a lot of weight:
+weighted_targets = (
+    jo_neighbours[jo_neighbours['body_pre'] == jo_id]
+    .groupby('post_type', dropna=False)['weight']
+    .sum()
+    .sort_values(ascending=False)
+)
+print(weighted_targets)
+# so 177 NaN values sum to 302 weight, compared to cb_intrinsic which sums to 490
+
+# see how heavy the weights are of the NaN values
+nan_targets = jo_neighbours[
+    (jo_neighbours['body_pre'] == jo_id) & (jo_neighbours['post_type'].isna())
+]
+print(nan_targets.sort_values('weight', ascending=False))
+# result: The weights are all tiny (9 down to 1)
+# this means a lot of weak connections
+
+# for further testing:
+nan_ids = nan_targets['body_post'].unique()
+print(df[df['bodyId'].isin(nan_ids)][['bodyId', 'status', 'statusLabel']])
+# only returned 2 -> says that many of the connections supposedly exist but are not annotated
+
+# further confirming it
+# print(len(nan_ids), 'unique nan targets')
+# print(df['bodyId'].isin(nan_ids).sum(), 'of those exist anywhere in df')
+
+# 527138 is from above, it's weird because its traced but still empty
+print(traced[traced['bodyId'] == 527138][['bodyId', 'status', 'statusLabel', 'superclass', 'class', 'type']])
+# otherwise: JO-B1_a's wiring has a strong, concentrated signal into cb_intrinsic,
+# with a long tail of weak connections mostly landing on unannotated fragments,
+# and one lone Traced-but-unclassified neuron sitting in that tail
+
+# Then the natural next hop: pick the single strongest target, body_post 15233, weight 46
+
+next_id = 15233
+filter_expr = (pc.field("body_pre") == next_id) | (pc.field("body_post") == next_id)
+next_neighbours = dataset.to_table(filter=filter_expr).to_pandas()
+next_neighbours['pre_type'] = next_neighbours['body_pre'].map(id_to_superclass)
+next_neighbours['post_type'] = next_neighbours['body_post'].map(id_to_superclass)
+print(next_neighbours.shape) # (1423, 5) -> a lot more neighbours
+print(next_neighbours['post_type'].value_counts(dropna=False))
+# results:
+# from the output there is 5 descending neurons, which may be the bridge from brain to vnc
+# next, filter to outgoing only before asking "where does its signal go"
+
+outgoing = next_neighbours[next_neighbours['body_pre'] == next_id]
+print(outgoing.shape)
+print(outgoing['post_type'].value_counts(dropna=False))
+
+weighted_out = (
+    outgoing.groupby('post_type', dropna=False)['weight']
+    .sum()
+    .sort_values(ascending=False)
+)
+print(weighted_out)
+# results:
+# cb_intrinsic is still the biggest bucket by weight, 1148
+# that says, central-brain intrinsic neurons are talking mostly to other central-brain intrinsic neurons.
+# descending_neuron is real but small, 42 out of 2507 total weight
+
+# the bridge toward VNC/motor, and right now it's a trickle, not a highway
+# Worth knowing precisely before deciding whether this is a dead end or just a narrow doorway:
+descending_out = outgoing[outgoing['post_type'] == 'descending_neuron'].sort_values('weight', ascending=False)
+print(descending_out)
+# so, these five digit IDs are clustered in the same narrow range as 10001, which was DNp01 (the Giant Fiber)
+
+# just checking the body_post to see what they are
+descending_ids = descending_out['body_post'].tolist()
+print(traced[traced['bodyId'].isin(descending_ids)][['bodyId', 'type', 'hemibrainType', 'synonyms']])
+# turns out Two out of five come back with real names attached:
+# DNp02, tagged Matsuo 2016: P3b, is the brain's first relay station for auditory input
+# DNg24, tagged Matsuo 2016: AMMC-Db7, same auditory-adjacent naming family. Weaker connection, but also real
+# DNge031, DNg29, WED180, has no information or publication yet
+
+# knowing about DNp02, that will be used
+#      bodyId     type hemibrainType               synonyms
+# 181   10197    DNp02         DNp02       Matsuo 2016: P3b
+dnp02_id = 10197
+
+filter_expr = (pc.field("body_pre") == dnp02_id) | (pc.field("body_post") == dnp02_id)
+dnp02_neighbours = dataset.to_table(filter=filter_expr).to_pandas()
+
+dnp02_neighbours['pre_type'] = dnp02_neighbours['body_pre'].map(id_to_superclass)
+dnp02_neighbours['post_type'] = dnp02_neighbours['body_post'].map(id_to_superclass)
+
+outgoing = dnp02_neighbours[dnp02_neighbours['body_pre'] == dnp02_id]
+print(outgoing.shape)
+
+weighted_out = (
+    outgoing.groupby('post_type', dropna=False)['weight']
+    .sum()
+    .sort_values(ascending=False)
+)
+print(weighted_out)
+# result
+# there exists a connection to vnc_motor! weight 50.
+
+# however, Total outgoing weight here is roughly 14,679, and vnc_motor is 50 of that
+# Compare that to vnc_intrinsic at 2510...
+# The tiny direct vnc_motor link found might be a real but minor shortcut,
+# while the "real" rhythm-generating pathway is likely one more hop through vnc_intrinsic
+
+# NaN bucket is now 9482, DNp02 is clearly a major hub (6945 outgoing edges vs JO-B1_a's 285)
+# so a bigger unannotated tail isn't shocking, but "not shocking" isn't the same as "checked."
+
+nan_out = outgoing[outgoing['post_type'].isna()]
+nan_ids = nan_out['body_post'].unique()
+print(len(nan_ids), 'unique nan targets') # 6369
+print(df[df['bodyId'].isin(nan_ids)]['status'].value_counts()) # 2 of each: orphan, glia, unimportant
+# only 6 of 6369 unique targets exist in df at all
+# NaN weight really is just "signal going into the unfinished part of the segmentation"
+
+# And identify the actual vnc_motor neurons that were hit directly
+motor_targets = outgoing[outgoing['post_type'] == 'vnc_motor'].sort_values('weight', ascending=False)
+print(traced[traced['bodyId'].isin(motor_targets['body_post'])][['bodyId', 'type', 'instance', 'somaNeuromere']])
+# so named leg muscle motor neurons were hit:
+# one that should jump out immediately: TTMn
+# That's the tergotrochanteral motor neuron, the same effector neuron driven by DNp01, the Giant Fiber,
+# to trigger a fly's jump-takeoff escape response, the very first neuron looked at
+
+# an auditory-descending pathway (DNp02) also drives that same jump muscle,
+# alongside genuine leg-extensor and leg-flexor motor neuron
+# And every single one of these sits at somaNeuromere == T2, the mesothoracic segment,
+# which controls the middle pair of legs, the fly's primary walking/jumping legs.
+
+# side track: look at vnc_intrinsic, the largest weights that the descending neuron connects to
+
