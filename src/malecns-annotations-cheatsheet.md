@@ -83,6 +83,16 @@ region prefixes: `ol` = optic lobe (vision), `cb` = central brain, `vnc` = ventr
 | `cb_sensory_tbc` / `visual_projection_tbc` / `sensory_ascending_tbc` / `vnc_sensory_tbc` / `vnc_tbc` | provisional versions of the categories above, annotation not fully finalized yet. | a rough first guess at the label, not double-checked yet. | unclear |
 | `nan` | no superclass assigned, likely correlates with non-traced/non-neuronal rows (orphan, glia, unimportant, etc, see `status` above). | a record with no label at all. | inferred |
 
+## finding: side (left/right) is missing for almost all sensory neurons
+
+`somaSide` tells you which side of the body a neuron sits on, and it's marked `confirmed` above, meaning the column works correctly when it has a value. but whether it actually *has* a value turns out to depend heavily on what kind of neuron you're looking at.
+
+checked across the whole dataset: almost every sensory neuron, whether it's for seeing, hearing, smell, touch, or anything else, is missing its side. some sensory groups are missing it 100% of the time, and the rest are still above 97%. meanwhile, almost every other kind of neuron, the ones that process, decide, or move something, has its side filled in essentially all the time.
+
+so the rule of thumb: if a neuron is a sensory neuron, don't expect to know which side it's on from this column, that information mostly just isn't there. for anything else, it's safe to trust.
+
+why this might be true (a guess, not confirmed): sensory neurons tend to repeat many times over, thousands of near-identical photoreceptors, thousands of near-identical hearing neurons, while neurons like the Giant Fiber are one-of-a-kind and individually important. it's possible the people labeling this data prioritized the unique, important neurons and didn't get around to labeling the side for every single repeated sensory cell.
+
 ## granularity: superclass -> class -> subclass -> supertype -> type -> instance
 
 these six columns aren't independent, they're one hierarchy, each level narrowing the one before it. broadest first:
