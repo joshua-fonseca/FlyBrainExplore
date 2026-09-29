@@ -32,9 +32,9 @@ identifiers, cross references to other datasets, spatial coordinates, and specia
 | `rootSide` | side of the segmentation "root" point (a technical anchor point in the 3d reconstruction), may or may not match `somaSide`. worth comparing the two columns directly to see if/when they differ. | `L`/`R`/`M` | unclear |
 | `somaLocation` | 3d spatial coordinates of the cell body (x, y, z). stored as an array, which is why `.nunique()` crashed on it earlier. | `[x, y, z]` | confirmed |
 | `tosomaLocation` | a reference point/vector related to soma position, likely used for orienting the skeleton toward the soma. exact technical definition unclear from public docs. | array, like somaLocation | unclear |
-| `entryNerve` | for sensory/afferent neurons, the peripheral nerve this sensory neuron uses to enter the central nervous system (CNS, which is the brain and spinal cord). | `adult metathoracic leg nerve` | confirmed |
+| `entryNerve` | for sensory/afferent neurons, the peripheral nerve this sensory neuron uses to enter the central nervous system (CNS, which is the brain and spinal cord). checked values: `AN` (antennal nerve) confirmed by cross-referencing `class`/`type`, carries both `olfactory` and `mechanosensory` (including `JO`) neurons. `MxLbN`, `aPhN`, `PhN`, `ON` seen but not yet checked the same way. | `AN` | confirmed |
 | `exitNerve` | for motor/efferent neurons, which peripheral nerve this neuron exits the cns through. | `adult first abdominal nerve` | confirmed |
-| `receptorType` | the type of sense this neuron detects (e.g. mechanosensory, chemosensory), for sensory neurons only. | varies | inferred |
+| `receptorType` | not a general sensory-modality label despite the name. only populated for `vnc_sensory`, not `cb_sensory` (checked directly, came back empty there). the actual values seen (`ppk23`, `ppk25`, `IR52b`) are specific gene names tied to pheromone detection, species recognition, and courtship behavior, not a general "what sense is this" field. | `ppk23` | confirmed |
 | `serialMotif` | identifies which serially repeating set of homologous neurons this one belongs to (many neuron types repeat once per body segment). | varies | inferred |
 | `mancSerial` / `mcnsSerial` | position number within a serial motif set, in the manc dataset vs this malecns dataset respectively. | integer | inferred |
 | `group` | a grouping id, likely clusters neurons considered functionally/connectionally similar during annotation. exact criteria not confirmed. | varies | unclear |
@@ -59,29 +59,62 @@ region prefixes: `ol` = optic lobe (vision), `cb` = central brain, `vnc` = ventr
 
 | value | what it means | human analogy | confidence |
 |---|---|---|---|
-| `ol_sensory` | primary visual input, the photoreceptors themselves. | the retina, the very first cells that catch light. | inferred |
-| `ol_intrinsic` | neurons that live and process entirely within the optic lobe, don't leave it. | local circuitry in the retina/early visual cortex doing edge/motion detection before signal goes anywhere else. | confirmed |
-| `visual_projection` | neurons that carry processed visual signal out of the optic lobe into the central brain. | the optic nerve, the cable carrying "already partly processed" visual info from eye to brain. | confirmed |
-| `visual_centrifugal` | neurons that send signal backward, from central brain back into the optic lobe. | feedback wiring, the brain "tuning" what the eye pays attention to, like top down attention. | confirmed |
-| `cb_sensory` | sensory input arriving directly into the central brain, not through the optic lobe or vnc (e.g. antennae, mouthparts). | smell/taste/touch signals reaching the brain directly, not via the spinal cord. | confirmed |
-| `cb_intrinsic` | neurons that live and process entirely within the central brain. | the "thinking" part of the brain, local associative circuitry, decision making. | confirmed |
-| `cb_motor` | motor neurons that originate in the central brain (not vnc), likely controlling head/mouthpart movement. | cranial nerves controlling your face/jaw, as opposed to spinal nerves controlling limbs. | inferred |
-| `cb_efferent` | central brain neurons sending output directly to the periphery, bypassing the vnc. | a brain signal that skips the spinal cord entirely and goes straight to a gland or muscle near the head. | inferred |
-| `cb_endocrine` | central brain neurons that release hormones rather than firing chemical/electrical synapses. | the hypothalamus, the brain region that controls hormone release. | confirmed |
-| `descending_neuron` | carries a signal from the central brain down into the vnc, a command. | upper motor neurons in your spinal cord, brain telling the body what to do. | confirmed |
-| `ascending_neuron` | carries a signal from the vnc up into the central brain, a status report. | sensory tracts running up your spinal cord telling the brain what the body is feeling. | confirmed |
-| `vnc_sensory` | sensory input arriving directly into the vnc (legs, wings, body surface). | touch/proprioception sensors in your limbs feeding straight into the spinal cord. | confirmed |
-| `vnc_intrinsic` | neurons that live and process entirely within the vnc. | local spinal cord circuits, like the reflex arc that pulls your hand off a hot stove without waiting for the brain. | confirmed |
-| `vnc_motor` | motor neurons originating in the vnc, drive the legs/wings/flight muscles directly. | lower motor neurons in your spinal cord, the final link to your leg muscles. | confirmed |
-| `vnc_efferent` | vnc neurons sending output to the periphery, similar role to vnc_motor but a distinct annotation bucket. | output nerves leaving the spinal cord toward the body, not necessarily to a skeletal muscle. | unclear |
-| `vnc_endocrine` | vnc neurons that release hormones. | hormone-releasing cells located along the spinal cord rather than the brain. | inferred |
-| `sensory_ascending` | sensory neurons whose signal is heading upward toward the brain, may overlap conceptually with vnc_sensory/ascending_neuron. | same idea as ascending_neuron, exact distinction between this and vnc_sensory not confirmed from public docs. | unclear |
-| `sensory_descending` | sensory neurons whose signal or fiber projects downward, rare category. | not confidently mapped to a clean human analogy, exact distinction unclear. | unclear |
-| `efferent_ascending` | very rare category (single digit count), output type neuron traveling upward, exact meaning not confirmed. | no confident analogy, flagged for verifying directly in data if it matters to your project. | unclear |
-| `efferent_descending` | output type neuron traveling downward, distinct from descending_neuron in the annotation scheme, exact distinction unclear. | possibly a finer subtype of the descending command pathway. | unclear |
-| `ENS` | enteric nervous system, neurons controlling the gut, largely independent of the main brain/vnc circuits. | your own enteric nervous system, sometimes called the "second brain", the gut's semi-autonomous nerve network. same term used in human biology. | confirmed |
-| `cb_sensory_tbc` / `visual_projection_tbc` / `sensory_ascending_tbc` / `vnc_sensory_tbc` / `vnc_tbc` | provisional versions of the categories above, annotation not fully finalized yet. | a draft label, "probably this bucket, not double checked yet." | unclear |
-| `nan` | no superclass assigned, likely correlates with non-traced/non-neuronal rows (orphan, glia, unimportant, etc, see `status` above). | an unlabeled record. | inferred |
+| `ol_sensory` | primary visual input, the photoreceptors themselves. | your retina, the first cells that catch light. | inferred |
+| `ol_intrinsic` | neurons that live and process entirely within the optic lobe, don't leave it. | the wiring right behind your eye that starts sorting out shapes and movement before anything reaches your brain. | confirmed |
+| `visual_projection` | neurons that carry processed visual signal out of the optic lobe into the central brain. | your optic nerve, the cable that carries what your eye already sorted out over to your brain. | confirmed |
+| `visual_centrifugal` | neurons that send signal backward, from central brain back into the optic lobe. | your brain reaching back to adjust what your eye pays attention to, like a spotlight it points on purpose. | confirmed |
+| `cb_sensory` | sensory input arriving directly into the central brain, not through the optic lobe or vnc (e.g. antennae, mouthparts). confirmed example: `JO-B1_a` auditory neurons classify here, since the antennal nerve carries straight to the central brain rather than through the vnc. | smell or taste signals going straight to your brain, skipping your spine entirely. | confirmed |
+| `cb_intrinsic` | neurons that live and process entirely within the central brain. | the part of your brain doing actual thinking and deciding, not just passing signals along. | confirmed |
+| `cb_motor` | motor neurons that originate in the central brain (not vnc), likely controlling head/mouthpart movement. | the nerves that move your face and jaw, separate from the ones that move your arms and legs. | inferred |
+| `cb_efferent` | central brain neurons sending output directly to the periphery, bypassing the vnc. | your brain sending a command straight to a muscle near your head, skipping your spine. | inferred |
+| `cb_endocrine` | central brain neurons that release hormones rather than firing chemical/electrical synapses. | the part of your brain that releases hormones instead of sending nerve signals. | confirmed |
+| `descending_neuron` | carries a signal from the central brain down into the vnc, a command. | your brain telling your body what to do, sent down through your spine. | confirmed |
+| `ascending_neuron` | carries a signal from the vnc up into the central brain, a status report. | your spine sending feeling and status back up to your brain. | confirmed |
+| `vnc_sensory` | sensory input arriving directly into the vnc (legs, wings, body surface). | touch sensors in your limbs that feed straight into your spine. | confirmed |
+| `vnc_intrinsic` | neurons that live and process entirely within the vnc. | a quick reflex, like pulling your hand off something hot before your brain even gets involved. | confirmed |
+| `vnc_motor` | motor neurons originating in the vnc, drive the legs/wings/flight muscles directly. | the last nerve in the chain, the one directly attached to your leg muscle. | confirmed |
+| `vnc_efferent` | vnc neurons sending output to the periphery, similar role to vnc_motor but a distinct annotation bucket. | a nerve leaving your spine toward your body, but not necessarily to a muscle. | unclear |
+| `vnc_endocrine` | vnc neurons that release hormones. | hormone-releasing cells sitting along your spine instead of your brain. | inferred |
+| `sensory_ascending` | sensory neurons whose signal is heading upward toward the brain, may overlap conceptually with vnc_sensory/ascending_neuron. | similar to ascending_neuron, exact difference from vnc_sensory not confirmed. | unclear |
+| `sensory_descending` | sensory neurons whose signal or fiber projects downward, rare category. | no simple everyday comparison found yet, exact meaning unclear. | unclear |
+| `efferent_ascending` | very rare category (single digit count), output type neuron traveling upward, exact meaning not confirmed. | no simple comparison found yet, worth checking directly if it matters to your project. | unclear |
+| `efferent_descending` | output type neuron traveling downward, distinct from descending_neuron in the annotation scheme, exact distinction unclear. | possibly a more specific version of the "brain sends a command down" pathway above. | unclear |
+| `ENS` | enteric nervous system, neurons controlling the gut, largely independent of the main brain/vnc circuits. | your own gut has its own separate nerve network too, sometimes called a "second brain." same idea here. | confirmed |
+| `cb_sensory_tbc` / `visual_projection_tbc` / `sensory_ascending_tbc` / `vnc_sensory_tbc` / `vnc_tbc` | provisional versions of the categories above, annotation not fully finalized yet. | a rough first guess at the label, not double-checked yet. | unclear |
+| `nan` | no superclass assigned, likely correlates with non-traced/non-neuronal rows (orphan, glia, unimportant, etc, see `status` above). | a record with no label at all. | inferred |
+
+## granularity: superclass -> class -> subclass -> supertype -> type -> instance
+
+these six columns aren't independent, they're one hierarchy, each level narrowing the one before it. broadest first:
+
+```
+superclass  ->  class  ->  subclass  ->  supertype  ->  type  ->  instance
+(region+role)  (varies)   (often       (groups        (specific    (one physical
+                           hemilineage)  related types)  identity)   neuron)
+```
+
+`superclass` is the only level guaranteed populated for every traced neuron. the middle three (`class`, `subclass`, `supertype`) are inconsistently filled, present for some neurons and `NaN` for others, and their exact meaning shifts depending on which `superclass` you're under (see the "run `df[df.superclass=='X']['class'].value_counts()`" note in the table above). `type` is the level that's consistently useful and consistently populated, it's the one this project has actually relied on throughout. `instance` only matters once you need a specific physical neuron rather than a category, it's `type` plus a side/number suffix.
+
+traced examples from this project, showing the levels that were actually populated for each:
+
+| superclass | class | type | instance | what it took to confirm this was the right level to pick from |
+|---|---|---|---|---|
+| `ol_sensory` | `visual` | `R1-R6` | (not checked) | had to check `type` under `ol_sensory` to find `R7`/`R8`/`HBeyelet` sitting alongside it, picking `superclass` alone wasn't enough |
+| `cb_sensory` | (not checked) | `JO-B1_a` | (not checked) | had to go past `superclass`/`entryNerve` entirely, down to `type`, split further by an external source (JO-A vs JO-B) not visible in any single column |
+| `vnc_motor` | (not checked) | `MNad21` | (not checked) | `type` alone didn't warn this was abdominal, that only showed up in `somaNeuromere`, a column outside this hierarchy entirely |
+
+the practical rule this project landed on (see "never trust the first row" below): `superclass` tells you the general neighborhood, but `type` is usually the minimum level needed before treating a neuron as representative of anything. for motor neurons specifically, `type` alone still wasn't enough, `somaNeuromere`/`exitNerve` (outside this hierarchy, in the "can ignore for now" table above) turned out to carry the detail that actually mattered.
+
+## lesson: never trust the first row
+
+a category that looks like one thing can secretly hold several different things inside it. grabbing the first row from a category, without checking what else is in there, is a real risk, not just being careful for no reason.
+
+concrete cases this bit:
+- the antenna carries both smell and hearing. picking a random antenna neuron could easily land on smell instead of hearing, they look the same at a glance.
+- within the eye's light-sensing cells, most of them detect motion and brightness, but a few detect color instead, and a rare handful aren't even used for seeing shapes at all, they help the fly track light and time of day. the first pick this project made happened to be a motion-detecting one, which was the right kind, but that was luck, not something checked ahead of time.
+- within the leg/wing motor neurons, most control the legs, but some control the abdomen instead, a completely different body part. one path this project traced turned out to end at an abdomen neuron, not a leg one, and that was only caught after actually checking which body segment it belonged to.
+
+the fix going forward: before treating any single neuron as representative of a whole group, look at what's actually inside that group first, and double check that the specific one picked is really in the sub-group wanted.
 
 ## things worth verifying yourself as you go
 
