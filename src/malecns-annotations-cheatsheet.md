@@ -22,6 +22,10 @@ these are the columns worth exploring first, they tell you what kind of neuron s
 | `somaSide` | which side of the body the cell body sits on. | `L`, `R`, or `M` (midline) | confirmed |
 | `somaNeuromere` | which body segment the cell body sits in, relevant mainly for vnc neurons (thoracic/abdominal segments, like a fly's version of spinal segments). | `T2` (mesothoracic) | confirmed |
 
+`somaSide` and `somaNeuromere` are independent, not a hierarchy, one isn't a narrower version of the other. side answers left/right, neuromere answers which segment, front to back. a neuron can be any combination of the two, e.g. an `A1` neuron can exist on either the left or right side, same as a `T2` neuron can. checking both gives two separate facts about a neuron, not two levels of the same fact.
+
+---
+
 ## can ignore for now
 
 identifiers, cross references to other datasets, spatial coordinates, and specialized annotations. not useless, just not needed for a first pass.
@@ -32,8 +36,8 @@ identifiers, cross references to other datasets, spatial coordinates, and specia
 | `rootSide` | side of the segmentation "root" point (a technical anchor point in the 3d reconstruction), may or may not match `somaSide`. worth comparing the two columns directly to see if/when they differ. | `L`/`R`/`M` | unclear |
 | `somaLocation` | 3d spatial coordinates of the cell body (x, y, z). stored as an array, which is why `.nunique()` crashed on it earlier. | `[x, y, z]` | confirmed |
 | `tosomaLocation` | a reference point/vector related to soma position, likely used for orienting the skeleton toward the soma. exact technical definition unclear from public docs. | array, like somaLocation | unclear |
-| `entryNerve` | for sensory/afferent neurons, the peripheral nerve this sensory neuron uses to enter the central nervous system (CNS, which is the brain and spinal cord). checked values: `AN` (antennal nerve) confirmed by cross-referencing `class`/`type`, carries both `olfactory` and `mechanosensory` (including `JO`) neurons. `MxLbN`, `aPhN`, `PhN`, `ON` seen but not yet checked the same way. | `AN` | confirmed |
-| `exitNerve` | for motor/efferent neurons, which peripheral nerve this neuron exits the cns through. | `adult first abdominal nerve` | confirmed |
+| `entryNerve` | for sensory neurons only, which physical cable bundle this neuron's fiber travels through to get into the brain/nerve cord from the outside world. checked values: `AN` (antennal nerve) confirmed by cross-referencing `class`/`type`, carries both `olfactory` and `mechanosensory` (including `JO`) neurons. `MxLbN`, `aPhN`, `PhN`, `ON` seen but not yet checked the same way. | `AN` | confirmed |
+| `exitNerve` | for motor neurons only, which physical cable bundle this neuron's fiber travels through to leave the brain/nerve cord on its way to a muscle. | `AbN2` | confirmed |
 | `receptorType` | not a general sensory-modality label despite the name. only populated for `vnc_sensory`, not `cb_sensory` (checked directly, came back empty there). the actual values seen (`ppk23`, `ppk25`, `IR52b`) are specific gene names tied to pheromone detection, species recognition, and courtship behavior, not a general "what sense is this" field. | `ppk23` | confirmed |
 | `serialMotif` | identifies which serially repeating set of homologous neurons this one belongs to (many neuron types repeat once per body segment). | varies | inferred |
 | `mancSerial` / `mcnsSerial` | position number within a serial motif set, in the manc dataset vs this malecns dataset respectively. | integer | inferred |
@@ -50,6 +54,10 @@ identifiers, cross references to other datasets, spatial coordinates, and specia
 | `itoleeHl` | hemilineage label under the ito/lee classification scheme, hemilineages are groups of neurons born from the same neural stem cell lineage during development. | varies | inferred |
 | `trumanHl` | hemilineage label under an alternate (truman lab) naming scheme for the same underlying developmental lineages. | varies | inferred |
 | `assignedOlHex1` / `assignedOlHex2` | coordinates on the optic lobe's hexagonal grid, the fly visual system is organized into repeating columns arranged in a hex pattern, and these two values likely give a column's grid address. only populated for optic lobe neurons (note the high `NaN` count). | varies | inferred |
+
+don't confuse `entryNerve`/`exitNerve` with `weight`. `weight` is a specific, one-to-one fact, how strong the link is between exactly one neuron and one other neuron. `entryNerve`/`exitNerve` is more like a shared neighbourhood or a shared street, many different neurons, wired to completely different places, can all travel through the same named nerve bundle on their way in or out, without being connected to each other at all. one tells you the strength of a specific link, the other tells you the general corridor a neuron's wire passes through, not who it's actually talking to.
+
+---
 
 ## superclass values
 
@@ -82,6 +90,8 @@ region prefixes: `ol` = optic lobe (vision), `cb` = central brain, `vnc` = ventr
 | `ENS` | enteric nervous system, neurons controlling the gut, largely independent of the main brain/vnc circuits. | your own gut has its own separate nerve network too, sometimes called a "second brain." same idea here. | confirmed |
 | `cb_sensory_tbc` / `visual_projection_tbc` / `sensory_ascending_tbc` / `vnc_sensory_tbc` / `vnc_tbc` | provisional versions of the categories above, annotation not fully finalized yet. | a rough first guess at the label, not double-checked yet. | unclear |
 | `nan` | no superclass assigned, likely correlates with non-traced/non-neuronal rows (orphan, glia, unimportant, etc, see `status` above). | a record with no label at all. | inferred |
+
+---
 
 ## finding: side (left/right) is missing for almost all sensory neurons
 
