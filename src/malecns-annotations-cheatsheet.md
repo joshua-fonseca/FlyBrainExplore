@@ -11,14 +11,14 @@ these are the columns worth exploring first, they tell you what kind of neuron s
 
 | column | what it means | example | confidence |
 |---|---|---|---|
-| `status` | broad proofreading/qc bucket. `Traced` means confirmed real, finished neuron (about 165k of these, this is where the "166k neurons" number comes from). others (`Orphan`, `Glia`, `Unimportant`, `Assign`, `Anchor`) are unfinished, non-neuronal, or excluded segments. | `Traced` | confirmed |
+| `status` | broad proofreading/qc bucket. `Traced` means in the traced bucket (about 165k of these, this is where the "166k neurons" number comes from), but it includes roughly traced neurons (see `statusLabel`), and not every traced row is fully classified. <br><br> id 527138 is `Traced` with no superclass, class or type (found in 04). others (`Orphan`, `Glia`, `Unimportant`, `Assign`, `Anchor`) are unfinished, non-neuronal, or excluded segments. | `Traced` | confirmed |
 | `statusLabel` | finer grained version of `status`, same idea, more qc stages (e.g. `Roughly traced` vs `Reviewed` vs `Prelim Roughly traced`). | `Reviewed` | confirmed |
 | `superclass` | the broadest classification bucket, where in the nervous system it lives and its general role (optic lobe, central brain, vnc, sensory, motor, etc). | `vnc_motor` | confirmed |
 | `class` | a level down from `superclass`, narrower grouping. exact meaning depends on which superclass it's under. run `df[df.superclass=='X']['class'].value_counts()` to see it in context. | varies by superclass | inferred |
 | `subclass` | a level down from `class`. for vnc neurons, often ties to hemilineage (developmental origin group). | `hl` | inferred |
 | `supertype` | groups related fine grained `type`s together, sits between `subclass` and `type` in specificity. | varies | inferred |
 | `type` | the finest grained systematic name for this neuron, specific to one functional/anatomical group. this is the most useful column for "what kind of neuron is this." | `MNhl29` | confirmed |
-| `instance` | a specific instance name for one physical neuron, usually the `type` plus a side/number suffix, so it's unique per neuron rather than shared across a type. | `MNhl29_R` | inferred |
+| `instance` | a specific instance name for one physical neuron, usually the `type` plus a side/number suffix, so it's unique per neuron rather than shared across a type. the suffix can follow a nickname, e.g. `DNp01(GF)_R`. uniqueness has not been tested yet (`traced['instance'].is_unique`). | `MNhl29_R` | inferred |
 | `somaSide` | which side of the body the cell body sits on. | `L`, `R`, or `M` (midline) | confirmed |
 | `somaNeuromere` | which body segment the cell body sits in, relevant mainly for vnc neurons (thoracic/abdominal segments, like a fly's version of spinal segments). | `T2` (mesothoracic) | confirmed |
 
@@ -33,12 +33,12 @@ identifiers, cross references to other datasets, spatial coordinates, and specia
 | column | what it means | example | confidence |
 |---|---|---|---|
 | `bodyId` | unique numeric id for this segment/neuron, the primary key of the dataset. every table that references a neuron uses this id, so you'll need it eventually just not for exploring types. | `556329` | confirmed |
-| `rootSide` | side of the segmentation "root" point (a technical anchor point in the 3d reconstruction), may or may not match `somaSide`. worth comparing the two columns directly to see if/when they differ. | `L`/`R`/`M` | unclear |
+| `rootSide` | side of the segmentation "root" point (a technical anchor point in the 3d reconstruction), may or may not match `somaSide`. worth comparing the two columns directly to see if/when they differ. <br><br> seen in 01: for the sensory neuron 11139, `somaSide` is empty and `rootSide` is `L`. | `L`/`R`/`M` | unclear |
 | `somaLocation` | 3d spatial coordinates of the cell body (x, y, z). stored as an array, which is why `.nunique()` crashed on it earlier. | `[x, y, z]` | confirmed |
 | `tosomaLocation` | a reference point/vector related to soma position, likely used for orienting the skeleton toward the soma. exact technical definition unclear from public docs. | array, like somaLocation | unclear |
-| `entryNerve` | the way in for what you feel. for sensory neurons only, the named cable this neuron's wire uses to enter the brain or nerve cord from the body (like the nerve in your arm carrying a stubbed toe's signal to your spine). checked values: `AN` (antennal nerve) confirmed by cross-referencing `class`/`type`, carries both `olfactory` and `mechanosensory` (including `JO`) neurons. `MxLbN`, `aPhN`, `PhN`, `ON` seen but not yet checked the same way. | `AN` | confirmed |
+| `entryNerve` | the way in for what you feel. for sensory neurons only. it is a special "named cable" this neuron's wire uses to enter the brain or nerve cord from the body (like the nerve in your arm carrying a stubbed toe's signal to your spine). <br><br> checked values: `AN` (antennal nerve) supported by cross-referencing `class`/`type` (not checked against official documentation), carries both `olfactory` and `mechanosensory` (including `JO`) neurons.  <br><br> note: the olfactory type senses smell, while the mechanosensory type senses physical movement <br><br> `MxLbN`, `aPhN`, `PhN`, `ON` seen but not yet checked the same way. | `AN` | inferred |
 | `exitNerve` | the way out for what you do. for motor neurons only, the named cable this neuron's wire uses to leave the brain or nerve cord for a muscle (like the nerve carrying the command to pull your foot away). | `AbN2` | confirmed |
-| `receptorType` | not a general sensory-modality label despite the name. only populated for `vnc_sensory`, not `cb_sensory` (checked directly, came back empty there). the actual values seen (`ppk23`, `ppk25`, `IR52b`) are specific gene names tied to pheromone detection, species recognition, and courtship behavior, not a general "what sense is this" field. | `ppk23` | confirmed |
+| `receptorType` | not a general sense-receptor label despite the name. only populated for `vnc_sensory`, not `cb_sensory` (checked directly among traced neurons, came back empty there). <br><br> the actual values seen (`ppk23`, `ppk25`, `IR52b`) are specific gene names tied to pheromone detection, species recognition, and courtship behavior, not a general "what sense is this" field. | `ppk23` | confirmed |
 | `serialMotif` | identifies which serially repeating set of homologous neurons this one belongs to (many neuron types repeat once per body segment). | varies | inferred |
 | `mancSerial` / `mcnsSerial` | position number within a serial motif set, in the manc dataset vs this malecns dataset respectively. | integer | inferred |
 | `group` | a grouping id, likely clusters neurons considered functionally/connectionally similar during annotation. exact criteria not confirmed. | varies | unclear |
@@ -56,6 +56,11 @@ identifiers, cross references to other datasets, spatial coordinates, and specia
 | `assignedOlHex1` / `assignedOlHex2` | coordinates on the optic lobe's hexagonal grid, the fly visual system is organized into repeating columns arranged in a hex pattern, and these two values likely give a column's grid address. only populated for optic lobe neurons (note the high `NaN` count). | varies | inferred |
 
 don't confuse `entryNerve`/`exitNerve` with `weight`. `weight` is a specific, one-to-one fact, how strong the link is between exactly one neuron and one other neuron. `entryNerve`/`exitNerve` is more like a shared neighbourhood or a shared street, many different neurons, wired to completely different places, can all travel through the same named nerve bundle on their way in or out, without being connected to each other at all. one tells you the strength of a specific link, the other tells you the general corridor a neuron's wire passes through, not who it's actually talking to.
+
+**about the connections file (`connectome-weights-male-cns-v1.0-minconf-0.5.feather`):** three columns, `body_pre`, `body_post`, `weight`, and 151,856,684 rows (from 00).
+- `weight` is treated as a synapse count in 00 (source still to be added). it has no sign, so it carries no excitatory or inhibitory information.
+- `minconf-0.5` in both filenames probably means synapse detections below 0.5 confidence were left out (inferred from the filename only, check the release notes).
+- the file looks sorted by weight, highest first (the neighbour tables in 01 and 04 come back that way), so reading from the top gives the strongest connections, not a random sample (to check).
 
 ---
 
@@ -89,7 +94,7 @@ region prefixes: `ol` = optic lobe (vision), `cb` = central brain, `vnc` = ventr
 | `efferent_descending` | output type neuron traveling downward, distinct from descending_neuron in the annotation scheme, exact distinction unclear. | possibly a more specific version of the "brain sends a command down" pathway above. | unclear |
 | `ENS` | enteric nervous system, neurons controlling the gut, largely independent of the main brain/vnc circuits. | your own gut has its own separate nerve network too, sometimes called a "second brain." same idea here. | confirmed |
 | `cb_sensory_tbc` / `visual_projection_tbc` / `sensory_ascending_tbc` / `vnc_sensory_tbc` / `vnc_tbc` | provisional versions of the categories above, annotation not fully finalized yet. | a rough first guess at the label, not double-checked yet. | unclear |
-| `nan` | no superclass assigned, likely correlates with non-traced/non-neuronal rows (orphan, glia, unimportant, etc, see `status` above). | a record with no label at all. | inferred |
+| `nan` | no superclass assigned, likely correlates with non-traced/non-neuronal rows (orphan, glia, unimportant, etc, see `status` above). at least one traced neuron also has no superclass (527138). | a record with no label at all. | inferred |
 
 ---
 
@@ -103,6 +108,8 @@ so the rule of thumb: if a neuron is a sensory neuron, don't expect to know whic
 
 why this might be true (a guess, not confirmed): sensory neurons tend to repeat many times over, thousands of near-identical photoreceptors, thousands of near-identical hearing neurons, while neurons like the Giant Fiber are one-of-a-kind and individually important. it's possible the people labeling this data prioritized the unique, important neurons and didn't get around to labeling the side for every single repeated sensory cell.
 
+another possibility, untested: sensory cell bodies sit outside the central nervous system (in the eye and the antenna), so a soma side may not exist in this dataset for them. that would fit `rootSide` being filled when `somaSide` is empty (seen on 11139 in 01). a way to test it: check whether `somaLocation` is empty for sensory neurons, e.g. `traced[traced['superclass'] == 'cb_sensory']['somaLocation'].isna().mean()`.
+
 ## granularity: superclass -> class -> subclass -> supertype -> type -> instance
 
 these six columns aren't independent, they're one hierarchy, each level narrowing the one before it. broadest first:
@@ -113,7 +120,7 @@ superclass  ->  class  ->  subclass  ->  supertype  ->  type  ->  instance
                            hemilineage)  related types)  identity)   neuron)
 ```
 
-`superclass` is the only level guaranteed populated for every traced neuron. the middle three (`class`, `subclass`, `supertype`) are inconsistently filled, present for some neurons and `NaN` for others, and their exact meaning shifts depending on which `superclass` you're under (see the "run `df[df.superclass=='X']['class'].value_counts()`" note in the table above). `type` is the level that's consistently useful and consistently populated, it's the one this project has actually relied on throughout. `instance` only matters once you need a specific physical neuron rather than a category, it's `type` plus a side/number suffix.
+`superclass` is the most reliably populated level, but not guaranteed: the unique superclass values among traced neurons include `nan` (seen in 00), for example 527138 (found in 04). the middle three (`class`, `subclass`, `supertype`) are inconsistently filled, present for some neurons and `NaN` for others, and their exact meaning shifts depending on which `superclass` you're under (see the "run `df[df.superclass=='X']['class'].value_counts()`" note in the table above). `type` is the level that's consistently useful and consistently populated, it's the one this project has actually relied on throughout. `instance` only matters once you need a specific physical neuron rather than a category, it's `type` plus a side/number suffix.
 
 traced examples from this project, showing the levels that were actually populated for each:
 
@@ -132,7 +139,7 @@ a category that looks like one thing can secretly hold several different things 
 concrete cases this bit:
 - the antenna carries both smell and hearing. picking a random antenna neuron could easily land on smell instead of hearing, they look the same at a glance.
 - within the eye's light-sensing cells, most of them detect motion and brightness, but a few detect color instead, and a rare handful aren't even used for seeing shapes at all, they help the fly track light and time of day. the first pick this project made happened to be a motion-detecting one, which was the right kind, but that was luck, not something checked ahead of time.
-- within the leg/wing motor neurons, most control the legs, but some control the abdomen instead, a completely different body part. one path this project traced turned out to end at an abdomen neuron, not a leg one, and that was only caught after actually checking which body segment it belonged to.
+- within the leg/wing motor neurons, most control the legs, but some control the abdomen instead, a completely different body part. one path this project traced turned out to end at an abdomen neuron, not a leg one, and that was only caught after actually checking which body segment it belonged to. caveat: the thorax also has wing motor neurons (see the `vnc_motor` row), so `T1` to `T3` is not automatically legs. cross-check with `exitNerve` before treating a thoracic segment as legs (to do).
 
 the fix going forward: before treating any single neuron as representative of a whole group, look at what's actually inside that group first, and double check that the specific one picked is really in the sub-group wanted.
 
